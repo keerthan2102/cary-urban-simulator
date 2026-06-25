@@ -1,7 +1,7 @@
 Cary Urban Expansion Forecasting Model
 An agent-based simulation (ABS) engine built with the Mesa framework to model, visualize, and inspect multi-temporal urban development patterns across the Town of Cary, North Carolina. This predictive model tracks spatial growth by simulating the divergent behaviors of corporate and suburban developer archetypes, utilizing real-world GIS baseline configurations.
 
-System Architecture Overview
+🚀 System Architecture Overview
 The application features a decoupled architecture where spatial geographic data layer states are isolated from active moving agents to ensure precise chronological snapshots.
 
 1. Spatial Patch Layer (RealLandPatch)
@@ -22,19 +22,19 @@ Dynamic State Classification: * 0: Void / Off-map territory (White)
 2. Behavioral Agent Archetypes
 The engine introduces two distinct structural paradigms to mimic real-world development incentives:
 
-Corporate Developer Agents (CorporateDeveloperAgent):
+🏢 Corporate Developer Agents (CorporateDeveloperAgent):
 
 Objective: Prioritizes structural density and accessibility.
 
 Mathematical Weighting: High preference for immediate highway proximity combined with a strong clustering premium to build next to pre-existing built or corporate zones.
 
-Suburban Developer Agents (SuburbanDeveloperAgent):
+🏡 Suburban Developer Agents (SuburbanDeveloperAgent):
 
 Objective: Mimics standard decentralized residential sprawl.
 
 Mathematical Weighting: Seeks a geographic buffer zone sweet-spot (offset from intense highway noise but within commuting distance). Imposes a spatial crowding penalty to disperse out into open, untouched canopy spaces.
 
-Multi-Temporal Forecasting Engine
+📅 Multi-Temporal Forecasting Engine
 The timeline processor separates its execution steps into three distinct macro-observation horizons:
 
 Present Day Cary Baseline (2026): A clean spatial render isolating the underlying terrain. Active simulation agents are completely filtered out to ensure a pristine 2026 baseline showing zero premature development.
@@ -43,14 +43,14 @@ Present Day Cary Baseline (2026): A clean spatial render isolating the underlyin
 
 20-Year Growth Forecast (2046): Simulates an additional 20 ticks (35 total execution steps) to project final canopy depletion and fringe land saturation.
 
-Repository File Structure
+🛠️ Repository File Structure
 Plaintext
 ├── app.py                         # Core simulation model, logic, and visualization dashboard
 ├── environment_builder.py         # Utility pipeline for preparing GIS matrices and infrastructure 
 ├── real_cary_matrix.npy           # Ground-truth Cary spatial classification matrix
 └── real_cary_highways.npy         # Calculated matrix layer mapping grid distances to highway corridors
 
-Quick Start Guide
+🏃‍♂️ Quick Start Guide
 Prerequisites
 Ensure you have Python installed alongside the required numerical mapping and simulation libraries:
 
