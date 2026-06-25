@@ -1,3 +1,4 @@
+import streamlit as st
 import mesa
 import random
 import matplotlib.pyplot as plt
@@ -5,7 +6,42 @@ import numpy as np
 from matplotlib.colors import ListedColormap
 import matplotlib.patches as mpatches
 
-# 1. High-Fidelity Spatial Patch Layer
+# Set up Streamlit web page configuration with custom municipal theme injectors
+st.set_page_config(page_title="Cary Urban Expansion Simulator", layout="wide")
+
+# Inject Custom CSS for Cary-themed brand consistency
+st.markdown("""
+    <style>
+    .reportview-container {
+        background-color: #0d1b15;
+    }
+    h1 {
+        color: #2e7d32 !important;
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+    }
+    .stMetric {
+        background-color: #1b382b !important;
+        padding: 15px !important;
+        border-radius: 10px !important;
+        border-left: 5px solid #d4af37 !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    div[data-testid="stMetricValue"] {
+        color: #ffffff !important;
+        font-family: monospace;
+    }
+    div[data-testid="stMetricLabel"] {
+        color: #a1c7b3 !important;
+        font-weight: bold;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# 1. HIGH-FIDELITY SPATIAL LAYER WITH REAL LDO ZONING
+# ==========================================
 class RealLandPatch(mesa.Agent):
     def __init__(self, model, x, y, classification_id, dist_to_highway):
         super().__init__(model)
@@ -14,24 +50,47 @@ class RealLandPatch(mesa.Agent):
         self.classification_id = classification_id
         self.dist_to_highway = dist_to_highway
         
+        # ACTIVE ZONING DICTIONARY MAPS LINKED TO TOWN OF CARY LDO DEFINITIONS
         if classification_id == 0: 
-            self.zone_type = "void"               
+            self.zone_type = "void"
+            self.ldo_zoning = "OFF-MAP"
         elif classification_id == 5: 
-            self.zone_type = "park"               
+            self.zone_type = "park"
+            self.ldo_zoning = "R/R" 
         elif classification_id == 2: 
             self.zone_type = "established_housing"
+            self.ldo_zoning = "R-12" 
         else: 
-            self.zone_type = "developable"         
+            self.zone_type = "developable"
+            
+            # Geographic coordinate overlay limits
+            dist_to_fenton = np.sqrt((self.x - 40)**2 + (self.y - 35)**2)
+            dist_to_chatham = np.sqrt((self.x - 22)**2 + (self.y - 22)**2)
+            
+            # Dynamic designation allocation 
+            if dist_to_fenton < 15 or dist_to_chatham < 12:
+                self.ldo_zoning = "MXD" 
+            else:
+                self.ldo_zoning = "R-40" 
 
-# 2. Base Developer Brain with Spatial Heuristics
+# ==========================================
+# 2. BEHAVIORAL DEVELOPER AGENTS
+# ==========================================
 class BaseSpatialDeveloper(mesa.Agent):
     def __init__(self, model, agent_id):
         super().__init__(model)
         self.agent_id = agent_id
-        self.development_id = 3 # Overwritten by subclasses
+        self.development_id = 3 
 
     def calculate_score(self, step_coords, patch):
         return 0
+
+    def develop_patch(self, cell_coords):
+        """Helper method to firmly apply development footprint onto a patch"""
+        for item in self.model.grid.get_cell_list_contents([cell_coords]):
+            if isinstance(item, RealLandPatch) and item.zone_type == "developable":
+                item.zone_type = self.agent_type_string
+                item.classification_id = self.development_id
 
     def step(self):
         possible_steps = self.model.grid.get_neighborhood(self.pos, moore=True, include_center=False)
@@ -40,7 +99,7 @@ class BaseSpatialDeveloper(mesa.Agent):
         
         for step in possible_steps:
             for item in self.model.grid.get_cell_list_contents([step]):
-                if isinstance(item, RealLandPatch) and item.zone_type == "developable":
+                if isinstance(item, RealLandPatch) and item.zone_type == "developable" and item.ldo_zoning != "R/R":
                     score = self.calculate_score(step, item)
                     if score > best_score:
                         best_score = score
@@ -48,55 +107,55 @@ class BaseSpatialDeveloper(mesa.Agent):
                         
         if best_step != self.pos:
             self.model.grid.move_agent(self, best_step)
-            for item in self.model.grid.get_cell_list_contents([best_step]):
-                if isinstance(item, RealLandPatch) and item.zone_type == "developable":
-                    # Mark specific developer archetype state tracking IDs
-                    item.zone_type = self.agent_type_string
-                    item.classification_id = self.development_id 
-                    self.model.total_houses_built += 1
+            self.develop_patch(best_step)
 
-# 🏢 Archetype 1: Corporate Cluster Strategy (Aggressive proximity to Highways & Existing Density)
 class CorporateDeveloperAgent(BaseSpatialDeveloper):
     def __init__(self, model, agent_id):
         super().__init__(model, agent_id)
         self.agent_type_string = "corp_development"
-        self.development_id = 4 # Maps to Crimson Red
+        self.development_id = 4 
 
     def calculate_score(self, step_coords, patch):
-        # Heavy preference for immediate highway proximity (low distance = high score)
-        score = 150 - (patch.dist_to_highway * 5)
-        
-        neighbors = self.model.grid.get_neighborhood(step_coords, moore=True, include_center=False)
-        for n_step in neighbors:
-            for item in self.model.grid.get_cell_list_contents([n_step]):
-                # Likes clustering near established infrastructure or corporate hubs
-                if isinstance(item, RealLandPatch) and item.classification_id in [2, 4]:
-                    score += 15 
+        dist_to_bond = np.sqrt((patch.x - 15)**2 + (patch.y - 20)**2)
+        if dist_to_bond <= 6:
+            return -9999 
+            
+        if patch.ldo_zoning == "R-40":
+            return -9999 
+            
+        score = 150 - (patch.dist_to_highway * 3)
+        if patch.ldo_zoning == "MXD":
+            score += 60 
+            
         return score
 
-# 🏡 Archetype 2: Suburban Sprawl Strategy (Seeks buffer zones away from noise, values open land)
 class SuburbanDeveloperAgent(BaseSpatialDeveloper):
     def __init__(self, model, agent_id):
         super().__init__(model, agent_id)
         self.agent_type_string = "suburban_development"
-        self.development_id = 5 # Maps to Deep Purple
+        self.development_id = 5 
 
     def calculate_score(self, step_coords, patch):
-        # Suburban sweet-spot: Accessible to highway commute but offset from edge noise
+        dist_to_bond = np.sqrt((patch.x - 15)**2 + (patch.y - 20)**2)
+        if dist_to_bond <= 6:
+            return -9999 
+            
+        if patch.ldo_zoning == "MXD":
+            return -9999 
+            
         if 8 <= patch.dist_to_highway <= 20:
             score = 90
         else:
             score = 30 - abs(patch.dist_to_highway - 14)
             
-        neighbors = self.model.grid.get_neighborhood(step_coords, moore=True, include_center=False)
-        for n_step in neighbors:
-            for item in self.model.grid.get_cell_list_contents([n_step]):
-                # Avoids packing into tight clusters (congestion penalty)
-                if isinstance(item, RealLandPatch) and item.classification_id in [2, 4, 5]:
-                    score -= 8 
+        if patch.ldo_zoning == "R-40":
+            score += 40
+            
         return score
 
-# 3. Simulation Model
+# ==========================================
+# 3. CORE SIMULATION MODEL (DECENTRALIZED WITH INITIAL BUILD)
+# ==========================================
 class CaryPredictiveModel(mesa.Model):
     def __init__(self, zone_path, highway_path, num_corp, num_suburban):
         super().__init__()
@@ -104,25 +163,36 @@ class CaryPredictiveModel(mesa.Model):
         self.highways = np.load(highway_path)
         self.height, self.width = self.zones.shape
         self.grid = mesa.space.MultiGrid(self.width, self.height, torus=False)
-        self.total_houses_built = 0
         self.developers = []
 
-        valid_spawn = []
+        mxd_compliant_pool = []
+        r40_compliant_pool = []
+
         for y in range(self.height):
             for x in range(self.width):
                 patch = RealLandPatch(self, x, y, self.zones[y][x], self.highways[y][x])
                 self.grid.place_agent(patch, (x, y))
+                
                 if patch.zone_type == "developable":
-                    valid_spawn.append((x, y))
+                    if patch.ldo_zoning == "MXD":
+                        mxd_compliant_pool.append((x, y))
+                    elif patch.ldo_zoning == "R-40":
+                        r40_compliant_pool.append((x, y))
 
+        # Spawn Corporate Developers and build immediately on start position
         for i in range(num_corp):
-            dev = CorporateDeveloperAgent(self, f"Corp_{i}")
-            self.grid.place_agent(dev, random.choice(valid_spawn))
+            dev = CorporateDeveloperAgent(self, f"Camp_{i}")
+            spawn_coords = random.choice(mxd_compliant_pool) if mxd_compliant_pool else random.choice(r40_compliant_pool)
+            self.grid.place_agent(dev, spawn_coords)
+            dev.develop_patch(spawn_coords)  # FIX: Instantly claims the spawn tile
             self.developers.append(dev)
             
+        # Spawn Suburban Developers and build immediately on start position
         for i in range(num_suburban):
             dev = SuburbanDeveloperAgent(self, f"Sub_{i}")
-            self.grid.place_agent(dev, random.choice(valid_spawn))
+            spawn_coords = random.choice(r40_compliant_pool) if r40_compliant_pool else random.choice(mxd_compliant_pool)
+            self.grid.place_agent(dev, spawn_coords)
+            dev.develop_patch(spawn_coords)  # FIX: Instantly claims the spawn tile
             self.developers.append(dev)
 
     def step(self):
@@ -130,75 +200,102 @@ class CaryPredictiveModel(mesa.Model):
         for developer in self.developers:
             developer.step()
 
-# 🗃️ Robust Agent-Filtered Map State Extractor
 def extract_map_matrix(model):
     matrix = np.zeros((model.height, model.width), dtype=int)
     for x in range(model.width):
         for y in range(model.height):
             for item in model.grid.get_cell_list_contents((x, y)):
                 if isinstance(item, RealLandPatch):
-                    if item.zone_type == "void": 
-                        matrix[y][x] = 0
-                    elif item.zone_type == "park": 
-                        matrix[y][x] = 1
-                    elif item.zone_type == "established_housing": 
-                        matrix[y][x] = 2
-                    elif item.zone_type == "developable": 
-                        matrix[y][x] = 3
-                    elif item.zone_type == "corp_development": 
-                        matrix[y][x] = 4
-                    elif item.zone_type == "suburban_development": 
-                        matrix[y][x] = 5
+                    if item.zone_type == "void": matrix[y][x] = 0
+                    elif item.zone_type == "park": matrix[y][x] = 1
+                    elif item.zone_type == "established_housing": matrix[y][x] = 2
+                    elif item.zone_type == "developable": matrix[y][x] = 3
+                    elif item.zone_type == "corp_development": matrix[y][x] = 4
+                    elif item.zone_type == "suburban_development": matrix[y][x] = 5
                     break 
     return np.copy(matrix)
 
-# 4. Timeline Generation Execution
-if __name__ == "__main__":
-    print("🎬 Running Comparative Archetype Growth Engine...")
-    sim = CaryPredictiveModel("real_cary_matrix.npy", "real_cary_highways.npy", 15, 15)
+# ==========================================
+# 4. STREAMLIT FRONTEND IMPLEMENTATION
+# ==========================================
+st.title("Town of Cary Urban Expansion Forecasting Model")
+st.markdown("🚧 *Interactive Geographic Growth & Canopy Inspector Engine*")
+
+# Dashboard Sidebar Setup with maximum values strictly capped to 20
+st.sidebar.header("🌲 Cary Simulation Panel")
+corp_count = st.sidebar.slider("Corporate Developer Agents", min_value=1, max_value=20, value=10)
+suburban_count = st.sidebar.slider("Suburban Developer Agents", min_value=1, max_value=20, value=10)
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("📜 Real Municipal LDO Enforcements")
+st.sidebar.info("""
+**Active Town Zoning Overlays:**
+* 🌲 **R/R District (Resource Recreation):** Environmental protection active across Bond Park bounds. Sprawl/Commercial builds completely restricted within a strict 100-foot buffer width boundary.
+* 🛍️ **MXD Overlay (Mixed-Use District):** Focused density limits active over Fenton and Chatham St corridors.
+* 🏡 **R-40 Standards (Low-Density):** Restricts high-intensity commercial footprint expansion into baseline forest reserves.
+""")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("📅 Run Control")
+run_button = st.sidebar.button("Execute Timeline Analysis", type="primary")
+
+if 'sim_run' not in st.session_state:
+    st.session_state.sim_run = False
+
+if run_button or not st.session_state.sim_run:
+    st.session_state.sim_run = True
     
-    m_present = extract_map_matrix(sim)
+    with st.spinner("Calculating decentralized macro-growth patterns..."):
+        sim = CaryPredictiveModel("real_cary_matrix.npy", "real_cary_highways.npy", corp_count, suburban_count)
+        m_present = extract_map_matrix(sim)
+        
+        for _ in range(15): sim.step()
+        m_10yr = extract_map_matrix(sim)
+        
+        for _ in range(20): sim.step()
+        m_20yr = extract_map_matrix(sim)
+
+    # Count metrics
+    open_canopy_left = np.sum(m_20yr == 3)
+    corp_built = np.sum(m_20yr == 4)
+    sub_built = np.sum(m_20yr == 5)
+
+    # Render Visual Metric KPIs
+    col1, col2, col3 = st.columns(3)
+    col1.metric(label="🌳 Compliant Open Canopy Left", value=f"{open_canopy_left} Pixels")
+    col2.metric(label="🏢 Approved Corporate Zones", value=f"{corp_built} Sites")
+    col3.metric(label="🏡 Permitted Residential Clusters", value=f"{sub_built} Sites")
+
+    st.markdown("---")
+
+    # Render Visual Maps
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(24, 10), dpi=300)
+    fig.patch.set_facecolor('#ffffff')
     
-    print("⏳ Simulating 10 Years of Behavioral Growth (2036)...")
-    for _ in range(15): 
-        sim.step()
-    m_10yr = extract_map_matrix(sim)
+    premium_palette = ListedColormap(['#ffffff', '#1b5e20', '#cfd8dc', '#e8f5e9', '#c62828', '#6a1b9a'])
     
-    print("⏳ Simulating 20 Years of Behavioral Growth (2046)...")
-    for _ in range(20): 
-        sim.step()
-    m_20yr = extract_map_matrix(sim)
-    
-    # 🎨 Multi-Archetype Visual Mapping Layout
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(24, 8))
-    
-    # Value Indices: 0=Void(White), 1=Parks(Meadow), 2=Existing(Beige), 3=Open Land(Sage), 4=Corp(Crimson Red), 5=Suburban(Deep Purple)
-    premium_palette = ListedColormap(['#ffffff', '#a1dbb2', '#e5dfd3', '#dbebd1', '#c0392b', '#8e44ad'])
-    
-    ax1.imshow(m_present, cmap=premium_palette, origin="lower", vmin=0, vmax=5)
-    ax1.set_title("1. Present Day Cary Baseline (2026)", fontsize=14, fontweight='bold', color='#2c3e50', pad=10)
+    ax1.imshow(m_present, cmap=premium_palette, origin="lower", vmin=0, vmax=5, interpolation='nearest')
+    ax1.set_title("1. Present Day Baseline (2026)", fontsize=16, fontweight='bold', color='#1b5e20', pad=15)
     ax1.axis('off')
     
-    ax2.imshow(m_10yr, cmap=premium_palette, origin="lower", vmin=0, vmax=5)
-    ax2.set_title("2. 10-Year Growth Forecast (2036)", fontsize=14, fontweight='bold', color='#2c3e50', pad=10)
+    ax2.imshow(m_10yr, cmap=premium_palette, origin="lower", vmin=0, vmax=5, interpolation='nearest')
+    ax2.set_title("2. 10-Year LDO Forecast (2036)", fontsize=16, fontweight='bold', color='#1b5e20', pad=15)
     ax2.axis('off')
     
-    ax3.imshow(m_20yr, cmap=premium_palette, origin="lower", vmin=0, vmax=5)
-    ax3.set_title("3. 20-Year Growth Forecast (2046)", fontsize=14, fontweight='bold', color='#2c3e50', pad=10)
+    ax3.imshow(m_20yr, cmap=premium_palette, origin="lower", vmin=0, vmax=5, interpolation='nearest')
+    ax3.set_title("3. 20-Year LDO Forecast (2046)", fontsize=16, fontweight='bold', color='#1b5e20', pad=15)
     ax3.axis('off')
     
-    # Detailed Explanatory Legend for Policy Inspection
     legends = [
-        mpatches.Patch(color='#a1dbb2', label='Public Parks & Nature Reserves'),
-        mpatches.Patch(color='#e5dfd3', label='Existing Built Neighborhoods'),
-        mpatches.Patch(color='#dbebd1', label='Available Open Spaces (Forest/Canopy)'),
-        mpatches.Patch(color='#c0392b', label='Corporate Clusters (Transit & Density Driven)'),
-        mpatches.Patch(color='#8e44ad', label='Suburban Sprawl (Noise Offset & Space Driven)')
+        mpatches.Patch(color='#1b5e20', label='LDO R/R Protected Zones (Parks/Water)'),
+        mpatches.Patch(color='#cfd8dc', label='LDO R-12 Existing Infrastructure'),
+        mpatches.Patch(color='#e8f5e9', label='Available Open Canopy Space'),
+        mpatches.Patch(color='#c62828', label='LDO MXD Approved Districts (Fenton/Chatham Corporate)'),
+        mpatches.Patch(color='#6a1b9a', label='LDO R-40 Single Family Subdivisions')
     ]
-    fig.legend(handles=legends, loc='lower center', ncol=5, fontsize=11, frameon=True, shadow=True, bbox_to_anchor=(0.5, 0.04))
     
-    plt.suptitle("Town of Cary Urban Expansion Forecasting Model — Archetype Inspection", fontsize=20, fontweight='bold', y=0.95, color='#2c3e50')
-    plt.tight_layout(rect=[0, 0.08, 1, 0.92])
+    fig.legend(handles=legends, loc='lower center', ncol=3, fontsize=13, frameon=True, facecolor='#f5f5f5', edgecolor='#d4af37', shadow=False, bbox_to_anchor=(0.5, -0.05))
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
     
-    plt.savefig("cary_timeline_forecast.png", dpi=200)
-    print("📸 High-fidelity segmented timeline analysis dashboard saved as 'cary_timeline_forecast.png'!")
+    st.pyplot(fig) 
+    
