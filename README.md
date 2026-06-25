@@ -1,43 +1,64 @@
-# Cary Urban Expansion Simulator (Geospatial ABM)
+Cary Urban Expansion Forecasting Model
+An agent-based simulation (ABS) engine built with the Mesa framework to model, visualize, and inspect multi-temporal urban development patterns across the Town of Cary, North Carolina. This predictive model tracks spatial growth by simulating the divergent behaviors of corporate and suburban developer archetypes, utilizing real-world GIS baseline configurations.
 
-An advanced, data-driven Agent-Based Model (ABM) built with Python and the Mesa framework. This project simulates urban expansion and land-use conflict within the Town of Cary, North Carolina, utilizing official public domain GIS datasets streamed directly from municipal REST APIs.
+System Architecture Overview
+The application features a decoupled architecture where spatial geographic data layer states are isolated from active moving agents to ensure precise chronological snapshots.
 
-## 🚀 Core Features & Architecture
+1. Spatial Patch Layer (RealLandPatch)
+Terrain Grid: Uses a MultiGrid environment mapping real Cary geographic boundaries.
 
-### 1. Live GIS Ingestion Pipeline (`GeoPandas`)
-* Bypasses static files by streaming live spatial vectors directly from the **Town of Cary Open Data Portal API**.
-* Ingests the municipal corporate boundary (`cary-corporate-limits`) and filters over 800+ local environmental assets from the `parks-and-recreation-feature-polygons` dataset.
-* Translates standard coordinate systems into **EPSG:2264 (NAD83 North Carolina State Plane)** to process geometric distances and acreage metrics in real-world linear feet.
+Dynamic State Classification: * 0: Void / Off-map territory (White)
 
-### 2. Heterogeneous Agent Polymorphism
-The model rejects simple random movement in favor of specialized AI developer archetypes with competing look-ahead heuristic utility functions:
-* **Corporate Developers (`CorporateDeveloperAgent`):** Driven by infrastructure proximity and urban aggregation. They receive scoring bonuses when clustering builds near transit corridors and existing developments.
-* **Suburban Developers (`SuburbanDeveloperAgent`):** Programmed to hunt for low-density single-family expansion, actively penalizing congested areas and prioritizing pristine forestry tracts.
-* **Regulatory Compliance:** Both agent profiles share an inherited legal framework that strictly forbids encroachment into protected public park polygons.
+1: Public Parks & Nature Reserves (Protected)
 
-### 3. Real-Time Analytical Dashboard
-* Integrates Mesa's native `DataCollector` engine to capture multi-variable snapshots at every execution turn.
-* Generates a side-by-side analytical plot mapping spatial agent distributions directly next to a historical time-series line graph tracking the inverse relationship between housing development and resource depletion.
+2: Existing Built Neighborhoods / Infrastructure (Static)
 
----
+3: Available Open Spaces / Forest Canopy (Developable)
 
-## 📊 Sample Visualizations
+4: Corporate Cluster Developments (Crimson Red)
 
-### Multi-Layer Basemap (Real GIS Elements)
-Below is the visualization of the pipeline successfully downloading, projecting, and clipping real municipal boundaries with protected green spaces:
+5: Suburban Sprawl Developments (Deep Purple)
 
-![Real Cary Map Layer](./real_cary_with_parks.png)
+2. Behavioral Agent Archetypes
+The engine introduces two distinct structural paradigms to mimic real-world development incentives:
 
-### Simulation Micro-Grid Output
-The initial simulation run using a macro-grid environment, tracking the clear divergence between corporate clustering and sprawling single-family neighborhood footprints:
+Corporate Developer Agents (CorporateDeveloperAgent):
 
-![Simulation Analysis](./cary_map.png)
+Objective: Prioritizes structural density and accessibility.
 
----
+Mathematical Weighting: High preference for immediate highway proximity combined with a strong clustering premium to build next to pre-existing built or corporate zones.
 
-## 🛠️ Project Structure & Setup
+Suburban Developer Agents (SuburbanDeveloperAgent):
 
-### Prerequisites
-Ensure you have the required spatial and simulation libraries installed:
-```bash
-pip install mesa geopandas pandas matplotlib numpy shapely
+Objective: Mimics standard decentralized residential sprawl.
+
+Mathematical Weighting: Seeks a geographic buffer zone sweet-spot (offset from intense highway noise but within commuting distance). Imposes a spatial crowding penalty to disperse out into open, untouched canopy spaces.
+
+Multi-Temporal Forecasting Engine
+The timeline processor separates its execution steps into three distinct macro-observation horizons:
+
+Present Day Cary Baseline (2026): A clean spatial render isolating the underlying terrain. Active simulation agents are completely filtered out to ensure a pristine 2026 baseline showing zero premature development.
+
+10-Year Growth Forecast (2036): Runs an initial 15 simulation execution ticks to observe immediate corridor growth.
+
+20-Year Growth Forecast (2046): Simulates an additional 20 ticks (35 total execution steps) to project final canopy depletion and fringe land saturation.
+
+Repository File Structure
+Plaintext
+├── app.py                         # Core simulation model, logic, and visualization dashboard
+├── environment_builder.py         # Utility pipeline for preparing GIS matrices and infrastructure 
+├── real_cary_matrix.npy           # Ground-truth Cary spatial classification matrix
+└── real_cary_highways.npy         # Calculated matrix layer mapping grid distances to highway corridors
+
+Quick Start Guide
+Prerequisites
+Ensure you have Python installed alongside the required numerical mapping and simulation libraries:
+
+Bash
+pip install mesa numpy matplotlib
+Running the Forecast Model
+Execute the main application file from your project terminal window:
+
+Bash
+python app.py
+Upon successful completion, the engine will process the timeline calculations, print status ticks to your console, and output a high-fidelity visual analysis chart saved directly to your workspace as cary_timeline_forecast.png.
