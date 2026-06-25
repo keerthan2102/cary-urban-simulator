@@ -1,6 +1,6 @@
 **Cary Urban Expansion Forecasting Model**
 
-**An Agent-Based Simulation (ABS)** engine built with the Mesa framework to model, visualize, and inspect multi-temporal urban development patterns across the Town of Cary, North Carolina. This predictive model tracks spatial growth by simulating the divergent behaviors of corporate and suburban developer archetypes, utilizing real-world GIS baseline configurations.
+**An Agent-Based Model (ABM)** simulation engine built with the Mesa framework to model, visualize, and inspect multi-temporal urban development patterns across the Town of Cary, North Carolina. This predictive model tracks spatial growth by simulating the divergent behaviors of corporate and suburban developer archetypes, utilizing real-world GIS baseline configurations.
 
 **🚀 System Architecture Overview**
 The application features a decoupled architecture where spatial geographic data layer states are isolated from active moving agents to ensure precise chronological snapshots.
